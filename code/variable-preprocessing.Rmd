@@ -1,0 +1,166 @@
+# Variable Pre-Processing
+
+Each code block should refer to the production of one dataset. Datasets should be saved in `data/variables`.
+
+## Initialize Packages
+```{r warning=FALSE}
+here::i_am("code/variable-preprocessing.Rmd")
+
+# Initialize packages
+packages <- c("tidyverse", "caret","ggplot2", "modelr", "boot", "here", "sf", "raster", "prism", "exactextractr", "devtools")
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Load packages
+invisible(lapply(packages, library, character.only = TRUE))
+
+#Github packages
+remotes::install_github("mikejohnson51/AOI") 
+remotes::install_github("mikejohnson51/climateR")
+library(AOI)
+library(climateR)
+
+
+
+set.seed(313)
+
+prism_set_dl_dir(here("data/PRISM"))
+```
+
+
+## GW Basin Precipitation
+Data source: PRISM
+Timeframe: 1901-2022
+Unit: mm
+
+```{r}
+#download PRISM data
+get_prism_annual("ppt", years = 1901:2022, keepZip = FALSE)
+
+#Format to pull produce raster:
+ppt_2013<- pd_to_file(prism_archive_subset("ppt", "annual", years = 2013))
+ppt_2013_rast <- raster(ppt_2013)
+
+#GW Basins shapefile
+GW_shape <- shapefile(here("data/GW_shapefile/Groundwater_Basin.shp"))
+
+#set CRS to the same
+GW_shape <- spTransform(GW_shape, crs(ppt_2013_rast))
+
+
+#Assign annual precip to each GW Basin for period of record
+GW_precip <- data.frame(HUC = GW_shape$BASIN_NAME) #initialize
+count <- 1 #initialize
+
+for(i in 1901:2022){ #period of record
+  count <- count+1
+  
+  rast_file <- pd_to_file(prism_archive_subset("ppt", "annual", years = i)) #read raster filename
+  tmp_rast <- raster(rast_file) #create raster
+  
+  #produce HUC means for that raster
+  tmp_mean <- exact_extract(tmp_rast, GW_shape, fun = "mean")
+  
+  GW_precip[,count] <- round(tmp_mean,2) #input means to dataframe
+  colnames(GW_precip)[count] <- c(as.character(i)) #rename column
+}
+
+# write_csv(GW_precip, here("data/variables/GW_Precipitation_ANNUAL.csv"))
+```
+
+## GW Basin Temperature
+Data source: PRISM
+Timeframe: 1901-2022
+Unit: degrees C
+
+```{r}
+#download PRISM data
+get_prism_annual("tmean", years = 1901:2022, keepZip = FALSE)
+
+#Format to pull produce raster:
+ppt_2013<- pd_to_file(prism_archive_subset("ppt", "annual", years = 2013))
+ppt_2013_rast <- raster(ppt_2013)
+
+#GW Basins shapefile
+GW_shape <- shapefile(here("data/GW_shapefile/Groundwater_Basin.shp"))
+
+#set CRS to the same
+GW_shape <- spTransform(GW_shape, crs(ppt_2013_rast))
+
+
+#Assign annual precip to each GWBasins for period of record
+GW_temp <- data.frame(HUC = GW_shape$BASIN_NAME) #initialize
+count <- 1 #initialize
+
+for(i in 1901:2022){ #period of record
+  count <- count+1
+  
+  rast_file <- pd_to_file(prism_archive_subset("tmean", "annual", years = i)) #read raster filename
+  tmp_rast <- raster(rast_file) #create raster
+  
+  #produce HUC means for that raster
+  tmp_mean <- exact_extract(tmp_rast, GW_shape, fun = "mean")
+  
+  GW_temp[,count] <- round(tmp_mean,2) #input means to dataframe
+  colnames(GW_temp)[count] <- c(as.character(i)) #rename column
+}
+
+write_csv(GW_temp, here("data/variables/GW_Temperature_ANNUAL.csv"))
+```
+
+## GW Basin ET
+Data source: TerraClimate
+Timeframe: 1958-2022 (years before 1958 replaced with basin mean over period of record)
+Unit: mm
+
+```{r}
+AZ <- aoi_get(state = "AZ")
+GWBasins <- st_sf(st_read(here("data/GW_shapefile/Groundwater_Basin.shp")))
+
+GW_annualET <- data_frame(GWBasin = GWBasins$BASIN_NAME) #dataframe with HUC8 numbers in order
+
+for (year in 1958:2022){
+  
+  d <- getTerraClim(AZ, #shape of AZ
+                  varname = "aet", #actual ET
+                  startDate = paste(year,"01","01",sep = "-"), 
+                  endDate= paste(year,"12","31", sep = "-"))
+  
+  
+  #calculate mean annual ET
+  summed_values <- terra::app(d$aet, sum)
+
+  z <- exact_extract(summed_values, GWBasins, fun = "mean", append_cols = "BASIN_NAME")
+  
+  z <- z %>%
+    rename_with(~paste0(as.character(year)), mean)
+  
+  GW_annualET <- cbind(GW_annualET,z[2])
+}
+
+#Produce mean annual ET for each basin across available period of record of terraClimate data (1958-2022) to be the ET values pre-1958
+
+GWMean <- rowMeans(as.matrix(GW_annualET[,2:66]))
+GW_annualET <- cbind(GW_annualET,GWMean)
+
+# Make columns for 1901-1957
+years <- data.frame(matrix(ncol = length(1901:1957), nrow = nrow(GW_annualET)))
+colnames(years) <- as.character(1901:1957)
+
+GW_annualET <- cbind(years, GW_annualET)
+
+# Replace all NA from 1901-1957 with mean basin ET
+for (i in 1901:1957){
+  GW_annualET[, as.character(i)] <- GW_annualET[,124]
+}
+
+# Reorder columns
+GW_annualET <- GW_annualET[,c(58,1:57,59:123)]
+
+#write_csv(GW_annualET, here("data/variables/GW_ET_ANNUAL.csv"))
+```
+

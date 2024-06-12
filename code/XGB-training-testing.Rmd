@@ -1,0 +1,138 @@
+---
+title: "XGBoost Model Training and Testing"
+output: pdf_document
+date: "2024-06-11"
+---
+
+```{r warning=FALSE, echo=FALSE}
+here::i_am("code/XGB-training-testing.Rmd")
+
+# Initialize packages
+packages <- c("tidyverse", "caret", "xgboost", "ggplot2", "modelr", "extrafont", "ggthemes", "boot", "here")
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Load packages
+invisible(lapply(packages, library, character.only = TRUE))
+
+set.seed(313)
+```
+
+## Load Dataset and Preprocess Data
+
+```{r}
+# Load dataset
+HUC_Data <- read.csv(here("data/HUC_GaugeData_FULL.csv"))
+
+# Create KEY column
+HUC_Data$KEY <- paste(HUC_Data$SITENUM, HUC_Data$YEAR, sep = "_")
+
+# Move KEY column to first position and remove site numbers
+HUC_Data <- HUC_Data[,c(53,1:52)]
+HUC_Data <- HUC_Data[,-3]
+
+# Log transform BFI
+HUC_Data$BFI_log <- logit(HUC_Data$BFI)
+
+# Rearrange columns
+HUC_Data <- HUC_Data[,c(1,4:6,53,2:3,7:52)]
+
+```
+
+## Model Training w/ 10-fold Cross Validation
+
+```{r}
+# Define hyperparameters
+tune_final_log <- list(
+  eta = 0.05,
+  max_depth = 6,
+  gamma = 0,
+  colsample_bytree = 1,
+  min_child_weight = 3,
+  subsample = 1
+)
+
+# Create 10-fold cross-validation indices
+num_folds <- 10
+fold_indices <- createFolds(HUC_Data$KEY, k = num_folds)
+
+# Initialize an empty dataframe to store the results
+results_df <- data.frame(KEY = character(0), Actual_BFI = numeric(0), Predicted_BFI = numeric(0), MSE = numeric(0), R2 = numeric(0))
+
+# Perform 10-fold cross-validation
+for (fold in 1:num_folds) {
+  # Get the indices for the current fold
+  fold_index <- fold_indices[[fold]]
+  
+  # Split the data into training and testing sets
+  training <- HUC_Data[-fold_index, ]
+  testing <- HUC_Data[fold_index, ]
+  
+  # Train an xgboost model on the training set
+  xgb.model <- xgboost(
+    nrounds = 1000,
+    data = as.matrix(training[, 8:53]),
+    label = training$BFI_log,
+    params = tune_final_log,
+    verbose = 0
+  )
+  
+  # Make predictions on the testing set
+  predictions <- predict(xgb.model, newdata = as.matrix(testing[, 8:53]))
+  predictions <- inv.logit(predictions)
+  
+  # Calculate MSE and R-squared
+  mse <- mean((testing$BFI - predictions)^2)
+  r2 <- R2(predictions, testing$BFI)
+  
+  # Store the results in the dataframe
+  results_fold <- data.frame(KEY = testing$KEY, Actual_BFI = testing$BFI, Predicted_BFI = round(predictions, 3), MSE = mse, R2 = r2)
+  results_df <- bind_rows(results_df, results_fold)
+  
+  cat("Completed fold", fold, "/", num_folds, "\n")
+}
+
+for(i in 1:nrow(HUC_Data)){
+  ind <- which(results_df$KEY == HUC_Data$KEY[i])
+  HUC_Data$Predicted_BFI[i] <- results_df$Predicted_BFI[ind]
+}
+```
+
+## Save XGBoost Model
+```{r}
+saveRDS(xgb.model, "results/XGBmodel-HUC.rda")
+```
+
+## Plotting
+```{r}
+A_P <- ggplot(data = results_df, mapping = aes(y = Actual_BFI, x = Predicted_BFI)) +
+  geom_point(alpha = 0.3, color = '#414141') +
+  geom_smooth(method = "lm", linetype = "dashed", color = 'black', linewidth = .75, se = FALSE, fullrange = TRUE) +
+  geom_abline(slope = 1, intercept = 0, color = "black", linewidth = 0.75) +
+  theme_few() +
+  theme(text = element_text(size = 16, family = "Helvetica"),
+        axis.title.y = element_text(size = 16, face = "bold"),
+        axis.title.x = element_text(size = 16, face = "bold"),
+        axis.ticks.length = unit(.1, 'cm'),
+        axis.ticks = element_line(size = 0.5),
+        plot.margin = margin(1, 1, 1, 1, "cm"),
+        panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)) +
+  scale_x_continuous(breaks = c(0, 0.25, 0.5, 0.75, 1), labels = c("", "0.25", "0.5", "0.75", "1"), expand = c(0, 0), limits = c(0, 1)) +
+  scale_y_continuous(breaks = c(0, 0.25, 0.5, 0.75, 1), labels = c("0", "0.25", "0.5", "0.75", "1"), expand = c(0, 0), limits = c(0, 1)) +
+  labs(y = "Observed BFI", x = "Predicted BFI")
+
+ggsave(
+  filename = "results/actual-predicted.pdf",
+  plot = A_P,
+  width = 8,
+  height = 6,
+  units = "in",
+  dpi = 600,
+  device = cairo_pdf()
+)
+```
+

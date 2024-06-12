@@ -1,0 +1,83 @@
+---
+title: "Hyperparameter Tuning"
+output: pdf_document
+date: "2023-09-01"
+---
+
+## Prepare Packages
+
+```{r warning=FALSE, echo=FALSE}
+here::i_am("code/hyperparameter-tuning.Rmd")
+
+# Initialize packages
+packages <- c("tidyverse","caret","xgboost", "ggplot2", "boot", "here")
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+
+set.seed(313)
+```
+
+## Load Dataset and Preprocess Data
+
+```{r}
+#Load dataset
+HUC_Data <- read_csv(here("data/HUC_GaugeData_FULL.csv"))
+
+HUC_Data$KEY <- paste(HUC_Data$SITENUM, HUC_Data$YEAR, sep = "_")
+
+# Move KEY column to first
+HUC_Data <- HUC_Data[,c(53,1:52)]
+HUC_Data <- HUC_Data[,-3] #remove site numbers
+
+#Log transform BFI; forces BFI between 0-1
+HUC_Data$BFI_log <- logit(HUC_Data$BFI)
+
+#Rearrange columns
+HUC_Data <- HUC_Data[,c(1,4:6,53,2:3,7:52)]
+```
+
+## Hyperparameter Tuning for HUC8 Data
+
+Takes \~ 1hr to run
+
+```{r warning=FALSE}
+nrounds = 1000
+
+tune_grid <- expand.grid(
+  nrounds = seq(from = 500, to = nrounds, by = 50),
+  eta = c(0.025, 0.05, 0.1),
+  max_depth = c(4, 5, 6),
+  gamma = c(0, 0.05, 0.1),
+  colsample_bytree = 1,
+  min_child_weight = c(1, 2, 3),
+  subsample = 1
+)
+
+start.time <- Sys.time()
+xgb_caret <- train(x = HUC_Data[,8:53],
+                   y = HUC_Data$BFI_log,
+                   method = "xgbTree",
+                   trControl = trainControl(
+                                    method = "cv", 
+                                    number = 5, 
+                                    verboseIter = TRUE),
+                   tuneGrid = tune_grid,
+                   verbosity = 0)
+
+xgb_caret$bestTune
+end.time <- Sys.time()
+time.taken <- round(end.time - start.time, 2)
+time.taken
+```
+
+### Final Best Hyperparameters:
+
+nrounds = 1000, max_depth = 6, eta = 0.05, gamma = 0, colsample_bytree =
+1, min_child_weight = 3, subsample = 1

@@ -1,0 +1,86 @@
+## Factor importance Plot
+
+```{r}
+#create importance dataframe
+xgb.model <- readRDS(here("results/XGBmodel-HUC.rda"))
+importance <- xgb.importance(model = xgb.model)
+```
+
+### Graphical Abstract style
+
+```{r}
+ggplot(importance[1:5,]) +
+  geom_col(aes(Gain, reorder(Feature, Gain, sum)), fill = "#076fa2", width = 0.6) +
+  ylab("Feature") +
+  xlab("Relative Importance")+
+  scale_x_continuous(breaks = c(0, 0.1, 0.2, 0.3),
+                     labels = c("0", "0.1", "0.2", "0.3"),
+                     position = "top",
+                     expand = c(0, 0), limits = c(0, .4)) +
+  theme(
+    panel.background = element_rect(fill = "white"),
+    panel.grid.major.x = element_line(color = "#A8BAC4", linewidth = 0.3),
+    axis.ticks.length = unit(0, "mm"),
+    axis.title = element_text(face = "bold", size = 14),
+    axis.text.y = element_blank(),
+    axis.line.y.left = element_line(color = "black", linewidth = 0.5),
+    axis.text.x = element_text(face = "bold"),
+    text = element_text(family = "Helvetica"))+
+  geom_text(
+    aes(0, y = Feature, label = c("Elevation", "Temperature", "Precipitation", "Soil Group A%", "ET")),
+    hjust = 0,
+    nudge_x = 0.005,
+    colour = "white",
+    size = 4.5)
+
+```
+
+### Normal plot style
+
+```{r}
+ggplot(importance[1:5,]) +
+  geom_col(aes(Gain, reorder(Feature, Gain, sum)), fill = "#076fa2", width = 0.6) +
+  ylab("Feature") +
+  xlab("Relative Importance")+
+  scale_x_continuous(breaks = c(0, 0.1, 0.2, 0.3),
+                     labels = c("0", "0.1", "0.2", "0.3"),
+                     position = "top",
+                     expand = c(0, 0), limits = c(0, .4)) +
+  theme(
+    panel.background = element_rect(fill = "white"),
+    panel.grid.major.x = element_line(color = "#A8BAC4", linewidth = 0.3),
+    axis.ticks.length = unit(0, "mm"),
+    axis.title = element_text(face = "bold", size = 10),
+    axis.text.y = element_text(face = "bold", size = 8),
+    axis.line.y.left = element_line(color = "black", linewidth = 0.5),
+    axis.text.x = element_text(face = "bold"),
+    text = element_text(family = "Helvetica", color = 'black'))+
+  scale_y_discrete(breaks = waiver(),
+                   labels = c("ET", "Soil Group A%", "Precipitation", "Temperature", "Elevation"))
+```
+
+Rillito (HUC8 - 15050302) basin recharge over period of record. Produced from the HUC_AnnualRecharge.R script.
+
+```{r}
+avg_recharge <- read_csv(here("results/HUC_Recharge_MEAN.csv"))
+
+rillito <- avg_recharge %>% filter(HUC8 == 15050302)
+verde <- avg_recharge %>% filter(HUC8 == 15060202)
+combined_data <- rbind(transform(rillito, Location = "Rillito"), transform(verde, Location = "Verde"))
+
+ggplot(combined_data, aes(x = mean_recharge, y = Location, fill = Location)) +
+  geom_boxplot(width = .5) +
+  geom_vline(xintercept = 0, linewidth = 1, linetype = 3) +
+  labs(x = "Recharge (mm/yr)", y = NULL) +
+  scale_fill_manual(values = c("Rillito" = "lightgrey", "Verde" = "lightgrey")) +
+  theme_classic() +
+  annotate("text", x = 17, y = 2.35, label = "Upper Verde", size = 5) +
+  annotate("text", x = -9, y = 1.35, label = "Rillito", size = 5)+
+  scale_x_continuous(n.breaks = 6) +
+  theme(legend.position = "none",
+        axis.line.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_text(size = 12), 
+        text = element_text(size = 14, family="Helvetica"))
+```

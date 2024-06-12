@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><metadata>
+    <idinfo>
+        <citation>
+            <citeinfo>
+                <title>Map</title>
+            </citeinfo>
+        </citation>
+        <descript>
+            <abstract/>
+            <purpose>This feature contains groundwater basin boundaries and provide base information for use in GIS systems to aid in assessment for a variety of planning and analysis purposes and to provide a geographic view with corresponding data. These data do not represent a legal record.</purpose>
+        </descript>
+        <keywords>
+            <theme>
+                <themekt>None</themekt>
+                <themekey>Planning Area</themekey>
+                <themekey>Arizona</themekey>
+                <themekey>Groundwater</themekey>
+                <themekey>adwrsde1</themekey>
+                <themekey>Basin</themekey>
+                <themekey>Hydrogeology</themekey>
+                <themekey>Hydrology basin boundaries</themekey>
+            </theme>
+        </keywords>
+        <accconst>None</accconst>
+        <useconst/>
+        <datacred/>
+    </idinfo>
+    <metainfo>
+        <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+        <metstdv>FGDC-STD-001-1998</metstdv>
+        <mettc>local time</mettc>
+    </metainfo>
+</metadata>
