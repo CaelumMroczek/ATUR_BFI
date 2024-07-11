@@ -164,3 +164,31 @@ GW_annualET <- GW_annualET[,c(58,1:57,59:123)]
 #write_csv(GW_annualET, here("data/variables/GW_ET_ANNUAL.csv"))
 ```
 
+
+## GW Basin USGS Streamgage-keyed data
+Data source: Various
+Timeframe: 1901-2022
+Goal: Assign precipitation, temperature, and ET data to each year/GWBasin
+
+```{r}
+GaugeData <- read_csv(here("data/GWBasins_GaugeData_FULL.csv"))
+
+for(i in 1:nrow(GaugeData)){
+  yr <- GaugeData$YEAR[i]
+  yr_index <- which(colnames(GW_Precipitation_ANNUAL) == yr)
+  
+  basin <- GaugeData$GWBASIN[i]
+  basin_index <- which(GW_Precipitation_ANNUAL$GWBasin == basin)
+  
+  #Precipitation
+  GaugeData[i,7] <- as.numeric(GW_Precipitation_ANNUAL[basin_index,yr_index])
+  
+  #Temperature
+  GaugeData[i,8] <- as.numeric(GW_Temperature_ANNUAL[basin_index,yr_index])
+  
+  #ET
+  GaugeData[i,12] <- as.numeric(GW_ET_ANNUAL[basin_index,yr_index])
+}
+
+#write_csv(GaugeData, here("data/GWBasins_GaugeData_FULL.csv"))
+```
