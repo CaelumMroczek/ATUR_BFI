@@ -26,20 +26,20 @@ set.seed(313)
 
 ```{r}
 # Load dataset
-HUC_Data <- read.csv(here("data/HUC_GaugeData_FULL.csv"))
+GW_Data <- read.csv(here("data/GWBasins_GaugeData_FULL.csv"))
 
 # Create KEY column
-HUC_Data$KEY <- paste(HUC_Data$SITENUM, HUC_Data$YEAR, sep = "_")
+GW_Data$KEY <- paste(GW_Data$SITENUM, GW_Data$YEAR, sep = "_")
 
 # Move KEY column to first position and remove site numbers
-HUC_Data <- HUC_Data[,c(53,1:52)]
-HUC_Data <- HUC_Data[,-3]
+GW_Data <- GW_Data[,c(53,1:52)]
+GW_Data <- GW_Data[,-3]
 
 # Log transform BFI
-HUC_Data$BFI_log <- logit(HUC_Data$BFI)
+GW_Data$BFI_log <- logit(GW_Data$BFI)
 
 # Rearrange columns
-HUC_Data <- HUC_Data[,c(1,4:6,53,2:3,7:52)]
+GW_Data <- GW_Data[,c(1,4:6,53,2:3,7:52)]
 
 ```
 
@@ -50,15 +50,15 @@ HUC_Data <- HUC_Data[,c(1,4:6,53,2:3,7:52)]
 tune_final_log <- list(
   eta = 0.05,
   max_depth = 6,
-  gamma = 0,
+  gamma = 0.05,
   colsample_bytree = 1,
-  min_child_weight = 3,
+  min_child_weight = 5,
   subsample = 1
 )
 
 # Create 10-fold cross-validation indices
 num_folds <- 10
-fold_indices <- createFolds(HUC_Data$KEY, k = num_folds)
+fold_indices <- createFolds(GW_Data$KEY, k = num_folds)
 
 # Initialize an empty dataframe to store the results
 results_df <- data.frame(KEY = character(0), Actual_BFI = numeric(0), Predicted_BFI = numeric(0), MSE = numeric(0), R2 = numeric(0))
@@ -69,8 +69,8 @@ for (fold in 1:num_folds) {
   fold_index <- fold_indices[[fold]]
   
   # Split the data into training and testing sets
-  training <- HUC_Data[-fold_index, ]
-  testing <- HUC_Data[fold_index, ]
+  training <- GW_Data[-fold_index, ]
+  testing <- GW_Data[fold_index, ]
   
   # Train an xgboost model on the training set
   xgb.model <- xgboost(
@@ -96,15 +96,15 @@ for (fold in 1:num_folds) {
   cat("Completed fold", fold, "/", num_folds, "\n")
 }
 
-for(i in 1:nrow(HUC_Data)){
-  ind <- which(results_df$KEY == HUC_Data$KEY[i])
-  HUC_Data$Predicted_BFI[i] <- results_df$Predicted_BFI[ind]
+for(i in 1:nrow(GW_Data)){
+  ind <- which(results_df$KEY == GW_Data$KEY[i])
+  GW_Data$Predicted_BFI[i] <- results_df$Predicted_BFI[ind]
 }
 ```
 
 ## Save XGBoost Model
 ```{r}
-saveRDS(xgb.model, "results/XGBmodel-HUC.rda")
+saveRDS(xgb.model, here("results/XGBmodel-GWBasins.rda"))
 ```
 
 ## Plotting
@@ -126,7 +126,7 @@ A_P <- ggplot(data = results_df, mapping = aes(y = Actual_BFI, x = Predicted_BFI
   labs(y = "Observed BFI", x = "Predicted BFI")
 
 ggsave(
-  filename = "results/actual-predicted.pdf",
+  filename = here("results/actual-predicted_GWBasins.pdf"),
   plot = A_P,
   width = 8,
   height = 6,
