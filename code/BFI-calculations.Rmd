@@ -1,5 +1,24 @@
 # BFI & Recharge Calculations
 
+# Initialize Packages
+```{r, warning=FALSE}
+here::i_am("code/BFI-calculations.Rmd")
+
+# Initialize packages
+packages <- c("tidyverse", "caret","ggplot2", "modelr", "boot", "here", "sf", "raster", "prism", "exactextractr", "devtools")
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Load packages
+invisible(lapply(packages, library, character.only = TRUE))
+
+set.seed(313)
+```
+
 ## BFI Prediction of Basins
 
 ```{r}
@@ -7,7 +26,7 @@
 source("BFI-predict-function.R")
 
 # Load in dataset of points on every stream reach
-PredictorPoints <- read_csv(here("data/HUC_PredictorPoints.csv"))
+PredictorPoints <- read_csv(here("data/GWBasins_PredictorPoints.csv"))
 Points_LatLong <- PredictorPoints[,2:3]
 
 # Divide the dataset into 10 equal sets
@@ -22,7 +41,7 @@ results_list <- list()
 for (i in 1:num_sets) {
   
   start.time <- Sys.time()
-  point_annualBFI <- BFI.predictor(input_dataframe = point_sets[[i]], model_path = here("results/XGBmodel-HUC.rda"))
+  point_annualBFI <- BFI.predictor(input_dataframe = point_sets[[i]], model_path = here("results/XGBmodel-GWBasins.rda"))
   end.time <- Sys.time()
   time.taken <- round(end.time - start.time,2)
   cat("Finished set", i, "of", num_sets)

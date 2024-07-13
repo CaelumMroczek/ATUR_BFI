@@ -33,13 +33,13 @@ BFI.predictor <- function(input_dataframe, model_path) {
   #DEM <- rast(here("data/variables/huc8.tif"))
 
   #Load precip csv
-  precip_df <- read.csv(here("data/variables/HUC_Precipitation_ANNUAL.csv"))
+  precip_df <- read.csv(here("data/variables/GW_Precipitation_ANNUAL.csv"))
 
   # Load temp data
-  temp_df <- read.csv(here("data/variables/HUC_Temperature_ANNUAL.csv"))
+  temp_df <- read.csv(here("data/variables/GW_Temperature_ANNUAL.csv"))
 
   #Load ET data
-  et_df <- read.csv(here("data/variables/HUC_ET_ANNUAL.csv"))
+  et_df <- read.csv(here("data/variables/GW_ET_ANNUAL.csv"))
 
   # Load HUC predictors
   HUC_Predictors <- read_csv(here("data/variables/HUC_Data_FULL.csv"))
