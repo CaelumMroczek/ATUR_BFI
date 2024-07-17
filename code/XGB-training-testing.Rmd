@@ -104,7 +104,7 @@ for(i in 1:nrow(GW_Data)){
 
 ## Save XGBoost Model
 ```{r}
-saveRDS(xgb.model, here("results/XGBmodel-GWBasins.rda"))
+saveRDS(xgb.model, "XGB-GWBasins")
 ```
 
 ## Plotting

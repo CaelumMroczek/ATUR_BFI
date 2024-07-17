@@ -2,13 +2,13 @@ BFI.predictor <- function(input_dataframe, model_path) {
   here::i_am("code/BFI-predict-function.R")
   
   # Load required packages
-  packages <- c("dplyr", "sf", "raster", "terra", "ggplot2", "readr", "boot", "progress", "here")
+  packages <- c("dplyr", "sf", "raster", "terra", "ggplot2", "readr", "boot", "progress", "here", "xgboost")
   invisible(lapply(packages, library, character.only = TRUE))
 
   set.seed(313) # Set random seed for reproducibility
   
   # Load the XGBoost model
-  xgb_model <- readRDS(model_path)
+  xgb_model <- model_path
   River_Points <- input_dataframe
   
   # Prepare the input data
@@ -42,7 +42,7 @@ BFI.predictor <- function(input_dataframe, model_path) {
   et_df <- read.csv(here("data/variables/GW_ET_ANNUAL.csv"))
 
   # Load GWBasin predictors
-  GW_Predictors <- read_csv(here("data/variables/HUC_Data_FULL.csv"))
+  GW_Predictors <- read_csv(here("data/variables/GWBasin_Data_FULL.csv"), show_col_types = FALSE)
 
   
   # Initialize progress bar
@@ -54,17 +54,17 @@ BFI.predictor <- function(input_dataframe, model_path) {
     p <- vect(River_Points[i, ], geom = c("LONG", "LAT"))
     GWBasin <- terra::extract(GW_Basins, p)
     elev <- terra::extract(DEM, p)
-    River_Points$GWBasin[i] <- as.numeric(as.character(GWBasin[, 2]))
-    River_Points$ELEVATION_FT[i] <- (elev[, 2]) * 3.281
+    River_Points$GWBasin[i] <- as.character(GWBasin[, 3])
+    River_Points$ELEV_FT[i] <- (elev[, 2]) * 3.281
     pb$tick()
   }
   
   print("Added GWBasin and Elevation to points")
   
   # Pre-calculate indices for ppt, temp, and ET data
-  pptGW <- match(River_Points$GWBasin, precip_df$GWBasin)
-  tempGW <- match(River_Points$GWBasin, temp_df$GWBasin)
-  etGW <- match(River_Points$GWBasin, et_df$GWBasin)
+  pptGWBasin <- match(River_Points$GWBasin, precip_df$GWBasin)
+  tempGWBasin <- match(River_Points$GWBasin, temp_df$GWBasin)
+  etGWBasin <- match(River_Points$GWBasin, et_df$GWBasin)
   
   # Initialize progress bar
   pb <- progress_bar$new(total = nrow(River_Points), format = "[:bar] :percent eta: :eta")
@@ -93,10 +93,10 @@ BFI.predictor <- function(input_dataframe, model_path) {
   RiverPoints_AllData <- RiverPoints_AllData[, c(1, 3:51)]
   
   # Predict BFI using the XGBoost model
-  feature_names <- xgb_model$feature_names
+  feature_names <- xgb.model$feature_names
   RiverPoints_AllData <- RiverPoints_AllData[, c("GWBasin", "YEAR", "LAT", "LONG", feature_names)]
   
-  RiverPoints_AllData$predictedBFI <- inv.logit(predict(object = xgb_model, newdata = as.matrix(RiverPoints_AllData)[, 5:50]))
+  RiverPoints_AllData$predictedBFI <- inv.logit(predict(object = xgb.model, newdata = as.matrix(RiverPoints_AllData[, 5:50])))
   
   return(RiverPoints_AllData)
 }

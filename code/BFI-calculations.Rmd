@@ -5,7 +5,7 @@
 here::i_am("code/BFI-calculations.Rmd")
 
 # Initialize packages
-packages <- c("tidyverse", "caret","ggplot2", "modelr", "boot", "here", "sf", "raster", "prism", "exactextractr", "devtools")
+packages <- c("tidyverse", "caret", "ggplot2", "modelr", "boot", "here", "sf", "raster", "prism", "exactextractr", "devtools")
 
 # Install packages not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -41,7 +41,9 @@ results_list <- list()
 for (i in 1:num_sets) {
   
   start.time <- Sys.time()
-  point_annualBFI <- BFI.predictor(input_dataframe = point_sets[[i]], model_path = here("results/XGBmodel-GWBasins.rda"))
+  #Model derived from code/XGB-training-testing
+  point_annualBFI <- BFI.predictor(input_dataframe = point_sets[[i]], model_path = xgb.model)
+  
   end.time <- Sys.time()
   time.taken <- round(end.time - start.time,2)
   cat("Finished set", i, "of", num_sets)
@@ -49,7 +51,10 @@ for (i in 1:num_sets) {
   results_list[[i]] <- point_annualBFI
 }
 
-#Produced results/PredictingPoints_AllData.csv
+#Create dataframe from list of dataframes
+results <- data.table::rbindlist(results_list)
+
+#write_csv(results, here("results/PredictingPoints_AllData.csv"))
 ```
 
 ## Calculate Recharge by HUC
@@ -65,33 +70,8 @@ point_BFI$Recharge <- ifelse(point_BFI$Recharge < 0, 0, point_BFI$Recharge)
 
 # Calculate mean annual recharge for each HUC and each year
 mean_recharge <- point_BFI %>%
-  group_by(HUC8, YEAR) %>%
+  group_by(GWBasin, YEAR) %>%
   summarise(mean_recharge = mean(Recharge, na.rm = TRUE))
 
-#write_csv(mean_recharge, here("results/HUC_Recharge_MEAN.csv"))
-```
-
-## Recharge Trend by HUC
-
-```{r}
-#Recharge trend for each HUC
-u_df <- unique(mean_recharge$HUC8)
-recharge_trend <- data_frame()
-for (i in 1:84){
-  huc_vect <- which(mean_recharge$HUC8 == u_df[i])
-  temp <- mean_recharge[huc_vect,]
-  subset_temp <- temp[which(temp$YEAR > 1990 & temp$YEAR < 2021), ]
-  
-  lm <- lm(mean_recharge ~ YEAR, data = subset_temp)
-  summ <- summary.lm(lm)
-  p_val <- summ$coefficients[8]
-  coeff_val <- summ$coefficients[2]
-  
-  l <- c(u_df[i], p_val, coeff_val)
-  recharge_trend <- rbind(recharge_trend, l)
-}
-
-names(recharge_trend) <- c("huc", "pval", "coeff")
-sig_r <- which(recharge_trend$pval < .05)
-sig_recharge <- recharge_trend[sig_r,]
+#write_csv(mean_recharge, here("results/GWBasin_Recharge_MEAN.csv"))
 ```
