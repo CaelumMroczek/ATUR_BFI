@@ -66,12 +66,18 @@ point_BFI <- PredictingPoints[,c(1:5,10,51)]
 point_BFI <- point_BFI %>%
   mutate(Recharge = predictedBFI * (PRECIP_MM - ET_MM))
 
-point_BFI$Recharge <- ifelse(point_BFI$Recharge < 0, 0, point_BFI$Recharge)
-
 # Calculate mean annual recharge for each HUC and each year
 mean_recharge <- point_BFI %>%
   group_by(GWBasin, YEAR) %>%
   summarise(mean_recharge = mean(Recharge, na.rm = TRUE))
 
-#write_csv(mean_recharge, here("results/GWBasin_Recharge_MEAN.csv"))
+mean_recharge$mean_recharge <- ifelse(mean_recharge$mean_recharge < 0, 0, mean_recharge$mean_recharge)
+
+mean_annual <- mean_recharge %>%
+  group_by(GWBasin) %>%
+  summarise(recharge_mm = mean(mean_recharge))
+
+mean_annual$recharge_mm <- ifelse(mean_annual$recharge_mm < 0, 0, mean_annual$recharge_mm)
+
+write_csv(mean_annual, here("results/GWBasin_Recharge_MEAN.nonzeroed.csv"))
 ```
